@@ -11,7 +11,6 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -21,6 +20,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+            path: ~/.cache/pip
+            key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+            restore-keys: |
+              ${{ runner.os }}-pip-
+        
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -33,6 +40,26 @@ jobs:
       - name: Run tests
         run: |
           pytest
+        
+  security:
+      runs-on: ubuntu-latest
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/python-3.9@master
+        continue-on-error: true
+        env:
+            SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+            args: --sarif-file-output=snyk.sarif --severity-threshold=high
+    
+      - name: Upload result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+            sarif_file: snyk.sarif
+
   docker-build-push:
     runs-on: ubuntu-latest
     steps:
